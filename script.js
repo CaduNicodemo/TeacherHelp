@@ -60,6 +60,32 @@ function showPage(pageId) {
         if (targetPage) {
             targetPage.style.display = 'block';
             console.log(`Showing page: ${pageId}-page`);
+
+            // If we just showed the calendar page, ensure the FullCalendar
+            // instance is rendered and sized correctly. FullCalendar cannot
+            // compute sizes when initialized on a hidden container, so we
+            // render (or update) it after the page becomes visible.
+            if (pageId === 'calendar') {
+                const calendarEl = document.getElementById('calendar');
+                if (calendarEl && calendarEl.fullCalendar) {
+                    const cal = calendarEl.fullCalendar;
+                    // Render only once
+                    if (!cal._rendered) {
+                        try {
+                            cal.render();
+                        } catch (e) {
+                            // Some environments may attach instance differently;
+                            // try calling render on a stored global instance as a fallback
+                            if (window.calendarInstance && typeof window.calendarInstance.render === 'function') {
+                                window.calendarInstance.render();
+                            }
+                        }
+                        cal._rendered = true;
+                    }
+                    // Always update size after becoming visible
+                    if (typeof cal.updateSize === 'function') cal.updateSize();
+                }
+            }
         } else {
             console.error(`Page not found: ${pageId}-page`);
             // Fallback to dashboard if page not found
@@ -110,10 +136,13 @@ function initializeCalendar() {
         }
     });
 
-    calendar.render();
-    
-    // Store calendar instance for later use
+    // Do not render immediately — if the calendar container is hidden the
+    // rendering can compute wrong sizes. Store the instance and render when
+    // the calendar page becomes visible (see `showPage` above).
     calendarEl.fullCalendar = calendar;
+    window.calendarInstance = calendar;
+    // Mark as not yet rendered; `showPage` will call `render()` and set this flag
+    calendar._rendered = false;
 
     // Filter calendar events
     document.getElementById('apply-calendar-filter').addEventListener('click', function() {
