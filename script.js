@@ -1,21 +1,21 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize Bootstrap components
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    tooltipTriggerList.map(function (tooltipTriggerEl) {
+    tooltipTriggerList.map(function(tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
-    
+
     // Initialize all modals
     document.querySelectorAll('.modal').forEach(modalEl => {
         new bootstrap.Modal(modalEl);
     });
-    
+
     // Global groups storage
     window.groupsData = [
         { id: '1', name: 'English 101', description: 'Beginner English class', studentCount: 15, color: '#4361ee' },
         { id: '2', name: 'Math Advanced', description: 'Advanced mathematics', studentCount: 12, color: '#ef476f' }
     ];
-    
+
     // Navigation
     const navLinks = document.querySelectorAll('.nav-link, [data-page]');
     navLinks.forEach(link => {
@@ -39,10 +39,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialize form handlers
     initializeFormHandlers();
-    
+
     // Initialize view and edit buttons
     initializeActionButtons();
-    
+
     // Initial update of all group selections
     updateGroupSelections();
 });
@@ -103,6 +103,7 @@ function showPage(pageId) {
 }
 
 // Initialize FullCalendar
+// Initialize FullCalendar with Mongoose backend integration
 function initializeCalendar() {
     const calendarEl = document.getElementById('calendar');
     if (!calendarEl) return;
@@ -114,61 +115,131 @@ function initializeCalendar() {
             center: 'title',
             right: 'dayGridMonth,timeGridWeek,timeGridDay'
         },
-        events: [{
-                title: 'English 101 Class',
-                start: '2023-05-10T10:00:00',
-                end: '2023-05-10T11:30:00',
-                backgroundColor: '#4361ee',
-                groupId: '1'
-            },
-            {
-                title: 'Math Advanced Class',
-                start: '2023-05-11T14:00:00',
-                end: '2023-05-11T15:30:00',
-                backgroundColor: '#ef476f',
-                groupId: '2'
+        // Fetch events from backend
+        events: async function(fetchInfo, successCallback, failureCallback) {
+            try {
+                const res = await fetch('/api/calendar-events');
+                const events = await res.json();
+                // Transform backend events into FullCalendar format
+                const fcEvents = events.map(ev => ({
+                    id: ev._id,
+                    title: ev.title,
+                    start: ev.start,
+                    end: ev.end,
+                    backgroundColor: ev.backgroundColor || '#6c757d',
+                    extendedProps: {
+                        description: ev.description,
+                        groupIds: ev.groupIds || []
+                    }
+                }));
+                successCallback(fcEvents);
+            } catch (err) {
+                console.error('Failed to fetch events', err);
+                failureCallback(err);
             }
-        ],
+        },
         eventClick: function(info) {
-            const description = info.event.extendedProps?.description || 'No description';
-            const groupId = info.event.groupId || 'None';
-            alert(`Event: ${info.event.title}\nDescription: ${description}\nStart: ${info.event.start}\nEnd: ${info.event.end || 'N/A'}\nGroup: ${groupId}`);
+            const description = info.event.extendedProps ? .description || 'No description';
+            const groupIds = info.event.extendedProps ? .groupIds || [];
+            alert(`Event: ${info.event.title}\nDescription: ${description}\nStart: ${info.event.start}\nEnd: ${info.event.end}\nGroups: ${groupIds.join(', ')}`);
         }
     });
 
-    // Do not render immediately — if the calendar container is hidden the
-    // rendering can compute wrong sizes. Store the instance and render when
-    // the calendar page becomes visible (see `showPage` above).
     calendarEl.fullCalendar = calendar;
     window.calendarInstance = calendar;
-    // Mark as not yet rendered; `showPage` will call `render()` and set this flag
     calendar._rendered = false;
 
-    // Filter calendar events
-    document.getElementById('apply-calendar-filter').addEventListener('click', function() {
-        const selectedGroups = Array.from(document.getElementById('calendar-group-filter').selectedOptions).map(option => option.value);
+    // Apply group filter
+    const applyFilterBtn = document.getElementById('apply-calendar-filter');
+    if (applyFilterBtn) {
+        applyFilterBtn.addEventListener('click', function() {
+            const selectedGroups = Array.from(document.getElementById('calendar-group-filter').selectedOptions)
+                .map(opt => opt.value);
 
-        if (selectedGroups.length > 0) {
             calendar.getEvents().forEach(event => {
-                if (selectedGroups.includes(event.groupId)) {
+                const groups = event.extendedProps.groupIds || [];
+                if (selectedGroups.length === 0 || groups.some(g => selectedGroups.includes(g))) {
                     event.setProp('display', 'auto');
                 } else {
                     event.setProp('display', 'none');
                 }
             });
-        } else {
-            calendar.getEvents().forEach(event => {
-                event.setProp('display', 'auto');
-            });
-        }
-    });
-
-    document.getElementById('reset-calendar-filter').addEventListener('click', function() {
-        document.getElementById('calendar-group-filter').selectedIndex = -1;
-        calendar.getEvents().forEach(event => {
-            event.setProp('display', 'auto');
         });
-    });
+    }
+
+    // Reset filter
+    const resetFilterBtn = document.getElementById('reset-calendar-filter');
+    if (resetFilterBtn) {
+        resetFilterBtn.addEventListener('click', function() {
+            document.getElementById('calendar-group-filter').selectedIndex = -1;
+            calendar.getEvents().forEach(event => event.setProp('display', 'auto'));
+        });
+    }
+
+    // Event creation handler
+    const saveEventBtn = document.getElementById('save-event');
+    if (saveEventBtn) {
+        saveEventBtn.addEventListener('click', async function() {
+            const title = document.getElementById('event-title').value;
+            const description = document.getElementById('event-description') ? .value || '';
+            const startDate = document.getElementById('event-start-date').value;
+            const endDate = document.getElementById('event-end-date').value;
+            const selectedGroupIds = Array.from(document.querySelectorAll('input[id^="event-group-"]:checked'))
+                .map(cb => cb.value);
+
+            if (!title || !startDate || !endDate) return alert('Please fill in all required fields');
+
+            try {
+                const res = await fetch('/api/calendar-events', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title,
+                        description,
+                        startDate,
+                        endDate,
+                        groups: selectedGroupIds,
+                        createdBy: 'ID_DO_PROFESSOR_FIXO_AQUI' // Substituir pelo ID real
+                    })
+                });
+                const newEvent = await res.json();
+
+                // Add event(s) to calendar
+                if (selectedGroupIds.length > 0) {
+                    selectedGroupIds.forEach(groupId => {
+                        const group = window.groupsData.find(g => g.id === groupId);
+                        calendar.addEvent({
+                            id: newEvent._id + '-' + groupId,
+                            title: `${title} (${group?.name || ''})`,
+                            start: startDate,
+                            end: endDate,
+                            backgroundColor: group ? .color || '#6c757d',
+                            extendedProps: {
+                                description,
+                                groupIds: [groupId]
+                            }
+                        });
+                    });
+                } else {
+                    calendar.addEvent({
+                        id: newEvent._id,
+                        title,
+                        start: startDate,
+                        end: endDate,
+                        backgroundColor: '#6c757d',
+                        extendedProps: { description, groupIds: [] }
+                    });
+                }
+
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addEventModal'));
+                if (modal) modal.hide();
+                document.getElementById('add-event-form').reset();
+            } catch (err) {
+                console.error('Failed to save event', err);
+                alert('Failed to save event');
+            }
+        });
+    }
 }
 
 // Initialize mini calendar for dashboard
@@ -206,22 +277,22 @@ function initializeFormHandlers() {
     setupFormHandler('save-group', 'group-name', 'group-description', 'addGroupModal', 'groups-container', createGroupCard);
     setupFormHandler('save-student', 'student-name', 'student-email', 'addStudentModal', 'students-table-body', createStudentRow);
     setupFormHandler('save-homework', 'homework-title', 'homework-description', 'assignHomeworkModal', 'homework-table-body', createHomeworkRow);
-    
+
     // Calendar Event Handler
     const saveEventBtn = document.getElementById('save-event');
     if (saveEventBtn) {
         saveEventBtn.addEventListener('click', function() {
             const title = document.getElementById('event-title').value;
-            const description = document.getElementById('event-description')?.value || '';
+            const description = document.getElementById('event-description') ? .value || '';
             const startDate = document.getElementById('event-start-date').value;
             const endDate = document.getElementById('event-end-date').value;
-            
+
             // Get colors from groupsData
             const groupColors = {};
             window.groupsData.forEach(group => {
                 groupColors[group.id] = group.color;
             });
-            
+
             // Get selected groups from checkboxes
             const selectedGroups = [];
             document.querySelectorAll('input[id^="event-group-"]:checked').forEach(checkbox => {
@@ -231,10 +302,10 @@ function initializeFormHandlers() {
                     color: groupColors[checkbox.value] || '#6c757d'
                 });
             });
-            
+
             if (title && startDate && endDate) {
                 const calendarEl = document.getElementById('calendar');
-                
+
                 if (selectedGroups.length > 0) {
                     // Create separate events for each selected group
                     selectedGroups.forEach(group => {
@@ -248,7 +319,7 @@ function initializeFormHandlers() {
                                 description: description
                             }
                         };
-                        
+
                         // Add to calendar
                         if (calendarEl && calendarEl.fullCalendar) {
                             calendarEl.fullCalendar.addEvent(newEvent);
@@ -265,15 +336,15 @@ function initializeFormHandlers() {
                             description: description
                         }
                     };
-                    
+
                     // Add to calendar
                     if (calendarEl && calendarEl.fullCalendar) {
                         calendarEl.fullCalendar.addEvent(newEvent);
                     }
                 }
-                
+
                 alert(`Event "${title}" has been added!`);
-                
+
                 // Close modal
                 const modalElement = document.getElementById('addEventModal');
                 const modalInstance = bootstrap.Modal.getInstance(modalElement);
@@ -283,7 +354,7 @@ function initializeFormHandlers() {
                     const newModal = new bootstrap.Modal(modalElement);
                     newModal.hide();
                 }
-                
+
                 // Reset form
                 document.getElementById('add-event-form').reset();
                 document.querySelectorAll('input[id^="event-group-"]:checked').forEach(checkbox => {
@@ -294,15 +365,15 @@ function initializeFormHandlers() {
             }
         });
     }
-    
+
     // Attendance Form
     const loadAttendanceBtn = document.getElementById('load-attendance');
     if (loadAttendanceBtn) {
         loadAttendanceBtn.addEventListener('click', function() {
             const groupSelect = document.getElementById('attendance-group-select');
-            const groupName = groupSelect.options[groupSelect.selectedIndex]?.text || '';
+            const groupName = groupSelect.options[groupSelect.selectedIndex] ? .text || '';
             const date = document.getElementById('attendance-date').value;
-            
+
             if (groupSelect.value && date) {
                 document.getElementById('attendance-group-name').textContent = groupName;
                 document.getElementById('attendance-date-display').textContent = new Date(date).toLocaleDateString();
@@ -339,25 +410,25 @@ function updateGroupSelections() {
         document.getElementById('homework-group-select'),
         document.getElementById('calendar-group-filter')
     ];
-    
+
     // Get all group checkbox containers
     const groupCheckboxContainers = [
         document.getElementById('event-groups')
     ];
-    
+
     // Update dropdowns
     groupSelects.forEach(select => {
         if (select) {
             // Save current selection if any
             const currentValue = select.value;
-            
+
             // Clear options except the first one (if it's a placeholder)
             const firstOption = select.querySelector('option:first-child');
             select.innerHTML = '';
             if (firstOption && !firstOption.value) {
                 select.appendChild(firstOption);
             }
-            
+
             // Add options for each group
             window.groupsData.forEach(group => {
                 const option = document.createElement('option');
@@ -365,19 +436,19 @@ function updateGroupSelections() {
                 option.textContent = group.name;
                 select.appendChild(option);
             });
-            
+
             // Restore selection if possible
             if (currentValue) {
                 select.value = currentValue;
             }
         }
     });
-    
+
     // Update checkboxes
     groupCheckboxContainers.forEach(container => {
         if (container) {
             container.innerHTML = '';
-            
+
             // Add a checkbox for each group
             window.groupsData.forEach(group => {
                 const div = document.createElement('div');
@@ -392,7 +463,7 @@ function updateGroupSelections() {
             });
         }
     });
-    
+
     // Update attendance groups preview
     const attendanceGroupsPreview = document.getElementById('attendance-groups-preview');
     if (attendanceGroupsPreview) {
@@ -415,20 +486,20 @@ function setupFormHandler(buttonId, nameFieldId, descFieldId, modalId, container
     if (saveBtn) {
         saveBtn.addEventListener('click', function() {
             const name = document.getElementById(nameFieldId).value;
-            const description = document.getElementById(descFieldId)?.value || '';
-            
+            const description = document.getElementById(descFieldId) ? .value || '';
+
             if (name) {
                 // Special handling for groups
                 if (buttonId === 'save-group') {
                     // Generate a new ID (in a real app, this would come from the server)
                     const newId = (Math.max(...window.groupsData.map(g => parseInt(g.id)), 0) + 1).toString();
-                    
+
                     // Get the selected color
                     const color = document.getElementById('group-color').value;
-                    
+
                     // Check if we're editing an existing group
                     const editingId = document.getElementById('addGroupModal').dataset.editingId;
-                    
+
                     if (editingId) {
                         // Update existing group
                         const groupIndex = window.groupsData.findIndex(g => g.id === editingId);
@@ -436,7 +507,7 @@ function setupFormHandler(buttonId, nameFieldId, descFieldId, modalId, container
                             window.groupsData[groupIndex].name = name;
                             window.groupsData[groupIndex].description = description;
                             window.groupsData[groupIndex].color = color;
-                            
+
                             // Update all events with this group's color
                             updateEventsWithGroupColor(editingId, color);
                         }
@@ -452,22 +523,22 @@ function setupFormHandler(buttonId, nameFieldId, descFieldId, modalId, container
                             color: color
                         });
                     }
-                    
+
                     // Update all group selections
                     updateGroupSelections();
                 }
-                
+
                 alert(`"${name}" has been added!`);
-                
+
                 const container = document.getElementById(containerId);
                 if (container) {
                     container.insertAdjacentHTML('beforeend', createElementFunc(name, description));
                 }
-                
+
                 // Get the modal element and hide it
                 const modalElement = document.getElementById(modalId);
                 const modalInstance = bootstrap.Modal.getInstance(modalElement);
-                
+
                 if (modalInstance) {
                     modalInstance.hide();
                 } else {
@@ -475,7 +546,7 @@ function setupFormHandler(buttonId, nameFieldId, descFieldId, modalId, container
                     const newModal = new bootstrap.Modal(modalElement);
                     newModal.hide();
                 }
-                
+
                 const form = document.getElementById(`add-${buttonId.split('-')[1]}-form`);
                 if (form) form.reset();
             } else {
@@ -509,9 +580,9 @@ function createGroupCard(name, description, color = '#4361ee') {
 function renderGroups() {
     const groupsContainer = document.getElementById('groups-container');
     if (!groupsContainer) return;
-    
+
     groupsContainer.innerHTML = '';
-    
+
     window.groupsData.forEach(group => {
         const groupCard = createGroupCard(group.name, group.description, group.color);
         const groupElement = document.createElement('div');
@@ -528,13 +599,13 @@ function updateEventsWithGroupColor(groupId, newColor) {
     calendarEvents.forEach(event => {
         event.style.backgroundColor = newColor;
     });
-    
+
     // Update any event cards for this group
     const eventCards = document.querySelectorAll(`.event-card[data-group-id="${groupId}"]`);
     eventCards.forEach(card => {
         card.querySelector('.card-header').style.backgroundColor = newColor;
     });
-    
+
     // Re-render the calendar to reflect changes
     renderCalendar();
 }
@@ -544,7 +615,7 @@ function createStudentRow(name, email) {
     const groupSelect = document.getElementById('student-group');
     const groupId = groupSelect.value;
     const groupName = groupSelect.options[groupSelect.selectedIndex].text;
-    
+
     return `
         <tr>
             <td>${name}</td>
@@ -563,7 +634,7 @@ function createHomeworkRow(title, description) {
     const today = new Date();
     const dueDate = new Date(today);
     dueDate.setDate(today.getDate() + 7);
-    
+
     return `
         <tr>
             <td>${title}</td>
@@ -590,7 +661,7 @@ function initializeActionButtons() {
             // In a real app, this would open a detailed view
         });
     });
-    
+
     document.querySelectorAll('.edit-group').forEach(btn => {
         btn.addEventListener('click', function() {
             const groupId = this.closest('.card').closest('[data-group-id]').dataset.groupId;
@@ -598,21 +669,21 @@ function initializeActionButtons() {
             const groupName = groupCard.querySelector('.card-title').textContent;
             const groupDesc = groupCard.querySelector('.card-text:not(:last-child)').textContent;
             const groupColor = this.getAttribute('data-color') || '#4361ee';
-            
+
             // Populate the modal with existing data
             document.getElementById('group-name').value = groupName;
             document.getElementById('group-description').value = groupDesc;
             document.getElementById('group-color').value = groupColor;
-            
+
             // Set a data attribute to know we're editing
             document.getElementById('addGroupModal').dataset.editingId = groupId;
-            
+
             // Show the modal
             const modal = new bootstrap.Modal(document.getElementById('addGroupModal'));
             modal.show();
         });
     });
-    
+
     // Student buttons
     document.querySelectorAll('.view-student, .edit-student').forEach(btn => {
         btn.addEventListener('click', function() {
@@ -620,12 +691,12 @@ function initializeActionButtons() {
             const row = this.closest('tr');
             const studentName = row.cells[0].textContent;
             const action = this.classList.contains('view-student') ? 'Viewing' : 'Editing';
-            
+
             alert(`${action} student: ${studentName} (ID: ${studentId || 'new'}`);
             // In a real app, this would open a detailed view or edit form
         });
     });
-    
+
     // Homework buttons
     document.querySelectorAll('.view-homework, .edit-homework').forEach(btn => {
         btn.addEventListener('click', function() {
@@ -633,7 +704,7 @@ function initializeActionButtons() {
             const row = this.closest('tr');
             const homeworkTitle = row.cells[0].textContent;
             const action = this.classList.contains('view-homework') ? 'Viewing' : 'Editing';
-            
+
             alert(`${action} homework: ${homeworkTitle} (ID: ${homeworkId || 'new'}`);
             // In a real app, this would open a detailed view or edit form
         });
