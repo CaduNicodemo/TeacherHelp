@@ -243,6 +243,7 @@ function initializeCalendar() {
 }
 
 // Initialize mini calendar for dashboard
+// Initialize mini calendar with backend integration
 function initializeMiniCalendar() {
     const miniCalendarEl = document.getElementById('mini-calendar');
     if (!miniCalendarEl) return;
@@ -254,21 +255,36 @@ function initializeMiniCalendar() {
             center: 'title',
             right: ''
         },
-        events: [{
-                title: 'English 101 Class',
-                start: '2023-05-10T10:00:00',
-                backgroundColor: '#4361ee'
-            },
-            {
-                title: 'Math Advanced Class',
-                start: '2023-05-11T14:00:00',
-                backgroundColor: '#ef476f'
+        height: 'auto',
+        events: async function(fetchInfo, successCallback, failureCallback) {
+            try {
+                const res = await fetch('/api/calendar-events');
+                const events = await res.json();
+                const fcEvents = events.map(ev => ({
+                    id: ev._id,
+                    title: ev.title,
+                    start: ev.start,
+                    end: ev.end,
+                    backgroundColor: ev.backgroundColor || '#6c757d',
+                    extendedProps: {
+                        description: ev.description,
+                        groupIds: ev.groupIds || []
+                    }
+                }));
+                successCallback(fcEvents);
+            } catch (err) {
+                console.error('Failed to fetch mini calendar events', err);
+                failureCallback(err);
             }
-        ],
-        height: 'auto'
+        },
+        eventClick: function(info) {
+            const description = info.event.extendedProps ? .description || 'No description';
+            alert(`Event: ${info.event.title}\nDescription: ${description}\nStart: ${info.event.start}`);
+        }
     });
 
     miniCalendar.render();
+    window.miniCalendarInstance = miniCalendar;
 }
 
 // Initialize form handlers
