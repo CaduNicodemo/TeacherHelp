@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance and Homework</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="topbar">
+    <a href="calendar.html"><button>Calendar</button></a>
+    <a href="grades.html"><button>Assessment</button></a>
+    <span id="userInfo"></span>
+    <button id="logoutBtn">Sair</button>
+  </div>
+
+  <div id="mainApp" style="display:none;">
+  <div class="container">
+    <h2>Groups</h2>
+    <!-- Botão para abrir modal de novo grupo -->
+    <button id="openGroupModalBtn">
+      ＋ Group
+    </button>
+
+  <!-- Lista de grupos existentes -->
+  <div id="groupsButtons"></div>
+
+  <!-- Modal para criar novo grupo -->
+  <div id="groupModal" class="modal">
+    <div class="modal-content">
+      <h3>Create New Group</h3>
+      
+      <div id="groupDays">
+        <select id="groupType">
+          <option value="K1" data-level="Kids">K1</option>
+          <option value="K2" data-level="Kids">K2</option>
+          <option value="J" data-level="Juniors">J</option>
+          <option value="J1" data-level="Juniors1-2">J1</option>
+          <option value="J2" data-level="Juniors1-2">J2</option>
+          <option value="TA" data-level="TeensA1-2">TA</option>
+          <option value="T1" data-level="TeensA1-2">T1</option>
+          <option value="T2" data-level="TeensA1-2">T2</option>
+          <option value="T3" data-level="Teens3-6">T3</option>
+          <option value="T4" data-level="Teens3-6">T4</option>
+          <option value="T5" data-level="Teens3-6">T5</option>
+          <option value="T6" data-level="Teens3-6">T6</option>
+        </select>
+        
+        <div class="days-container">
+          <label><input type="checkbox" value="0"> Domingo</label>
+          <label><input type="checkbox" value="1"> Segunda</label>
+          <label><input type="checkbox" value="2"> Terça</label>
+          <label><input type="checkbox" value="3"> Quarta</label>
+          <label><input type="checkbox" value="4"> Quinta</label>
+          <label><input type="checkbox" value="5"> Sexta</label>
+          <label><input type="checkbox" value="6"> Sábado</label>
+        </div>
+      </div>
+
+      <input id="groupName" placeholder="Group name">
+      
+      <div id="colorPalette">
+        <button class="color-option" data-color="var(--vermelho-claro-grupo)" style="background: var(--vermelho-claro-grupo);"></button>
+        <button class="color-option" data-color="var(--laranja-grupo)" style="background: var(--laranja-grupo);"></button>
+        <button class="color-option" data-color="var(--amarelo-grupo)" style="background: var(--amarelo-grupo);"></button>
+        <button class="color-option" data-color="var(--verde-grupo)" style="background: var(--verde-grupo);"></button>
+        <button class="color-option" data-color="var(--azul-claro-grupo)" style="background: var(--azul-claro-grupo);"></button>
+        <button class="color-option" data-color="var(--azul-grupo)" style="background: var(--azul-grupo);"></button>
+        <button class="color-option" data-color="var(--roxo-grupo)" style="background: var(--roxo-grupo);"></button>
+        <button class="color-option" data-color="var(--rosa-grupo)" style="background: var(--rosa-grupo);"></button>
+      </div>
+
+      <input type="hidden" id="groupColor" value="var(--azul-grupo)">
+    
+      <div class="modal-buttons">
+        <button id="addGroupBtn" style="background: var(--azul-rb);">Create Group</button>
+        <button id="closeGroupModalBtn" style="background: var(--cinza-claro-rb);">Cancel</button>
+      </div>
+    </div>
+  </div>
+  
+
+    <!-- ===================== -->
+    <!-- Seções que aparecem após selecionar grupo -->
+    <!-- ===================== -->
+    <div id="groupDetails" style="display:none; margin-top: 30px;">
+      <button id="deleteGroupBtn" style="background: crimson; color: white;">🗑️ Deletar Grupo</button>
+
+      <div id="studentsSection">
+        <h3>Students</h3>
+        <input id="studentName" placeholder="Student name">
+        <button id="addStudentBtn">Add Student</button>
+        <table id="studentsTable">
+          <tr><th>Name</th><th>Delete</th></tr>
+        </table>
+      </div>
+
+      <div id="lessonsSection">
+        <h3>Lessons</h3>
+        <div id="lessonsList">
+          <!-- Aulas aparecerão aqui -->
+        </div>
+      </div>
+      <!-- ===================== -->
+
+    </div>
+    <!-- ===================== MODAL DE AULA ===================== -->
+    <div id="lessonModal">
+      <div id="lessonModalContent">
+        <h3>Mark Attendance & Homework</h3>
+        <table id="lessonModalTable">
+          <tr>
+            <th>Student</th>
+            <th>Attendance</th>
+            <th>Homework</th>
+          </tr>
+          <!-- Alunos serão adicionados aqui dinamicamente -->
+        </table>
+        <button id="saveLessonBtn">Save</button>
+        <button id="closeLessonBtn">Close</button>
+      </div>
+    </div>
+  </div>
+    <!-- ALERTAS DE FALTAS E HOMEWORK -->
+<!-- ===================== -->
+<div id="alertsSection" style="margin-top: 30px; display: none;">
+  <div class="container">
+    <!-- Botão para gerar alertas -->
+    <button id="generateAlertsBtn" style="background: var(--laranja-grupo); margin-bottom: 15px;">
+      Generate Alerts
+    </button>
+    
+    <!-- Caixa de alertas -->
+    <div id="alertsContainer" style="display: none">
+      <!-- Alertas serão gerados aqui -->
+    </div>    
+    <!-- Botão para enviar via WhatsApp -->
+    <button id="sendWhatsAppBtn" style="display: none;">
+      Send via WhatsApp
+    </button>
+  </div>
+</div>
+
+  <script>
+    // Cor de grupo
+    document.querySelectorAll('.color-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const selectedColor = btn.dataset.color;
+        document.getElementById('groupColor').value = selectedColor;
+        document.querySelectorAll('.color-option').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+    });
+  </script>
+
+  <script type="module" src="script.js"></script>
+</body>
+</html>
+
+
+
+

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Calendário de Eventos</title>
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+
+</head>
+<body>
+  <div id="topbar">
+    <a href="groups.html"><button>Groups</button></a>
+    <span id="userInfo"></span>
+    <button id="logoutBtn">Sair</button>
+  </div>
+
+  <h2 style="text-align:center;">Calendário de Eventos</h2>
+
+  <div style="text-align:center;">
+    <select id="filterSelect"></select>
+    <button id="addEventBtn">+ Event</button>
+  </div>
+
+  <div id="eventForm">
+    <h3>New Event</h3>
+    <input type="text" id="eventTitle" placeholder="Event title">
+    <input type="date" id="eventDate">
+    <select id="groupSelect"></select>
+    <div id="eventBtns">
+      <button id="saveEventBtn">Salvar</button>
+      <button id="cancelEventBtn">Cancelar</button>
+      <button id="deleteEventBtn" style="background:#dc3545; color:white;">Excluir</button>
+    </div>
+  </div>
+
+  <div id="calendar"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+  <script type="module" src="./auth.js"></script>
+  <script type="module" src="./calendar.js"></script>
+</body>
+</html>
